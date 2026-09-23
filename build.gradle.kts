@@ -53,6 +53,11 @@ tasks.withType<Test> {
         }
     }
     maxHeapSize = "1g"
+    val colimaSocket = file("${System.getProperty("user.home")}/.colima/default/docker.sock")
+    if (colimaSocket.exists()) {
+        environment("DOCKER_HOST", "unix://${colimaSocket.absolutePath}")
+        environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
+    }
 }
 
 tasks.withType<JavaCompile> {

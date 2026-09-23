@@ -4,7 +4,7 @@ Frontrow is a single Spring Boot service for seated ticket sales. A buyer asks f
 
 ## Tests
 
-Tests start PostgreSQL, Redis, and Kafka with Testcontainers. Docker must be running. No API key is required.
+Tests start PostgreSQL, Redis, and Kafka with Testcontainers. Docker must be running. No API key is required. On Colima, the test task points Testcontainers at the Colima socket.
 
 ```bash
 ./gradlew test

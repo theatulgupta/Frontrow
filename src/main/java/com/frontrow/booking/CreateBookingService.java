@@ -75,7 +75,7 @@ public class CreateBookingService {
         try (MdcScope ignored = MdcScope.open(null, seatId, showId, userId)) {
             Optional<BookingRecord> existing = bookings.findByUserAndKey(userId, idempotencyKey);
             if (existing.isPresent()) {
-                return existing.get();
+                return replay(existing.get(), showId, seatId).booking();
             }
             rejectStoredAttempt(userId, showId, seatId, idempotencyKey);
             ShowResponse show = catalog.requireShow(showId);

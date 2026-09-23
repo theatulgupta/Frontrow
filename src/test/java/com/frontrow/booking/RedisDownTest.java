@@ -1,20 +1,31 @@
 package com.frontrow.booking;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import com.frontrow.support.IntegrationTestBase;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.TestPropertySource;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.redisson.client.RedisConnectionException;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-@TestPropertySource(properties = "frontrow.payment.consumer-enabled=false")
 class RedisDownTest extends IntegrationTestBase {
 
-    @DynamicPropertySource
-    static void redisDown(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", () -> "127.0.0.1");
-        registry.add("spring.data.redis.port", () -> 1);
+    @MockitoBean
+    private RedissonClient redissonClient;
+
+    @BeforeEach
+    void redisRejectsLocks() throws InterruptedException {
+        RLock lock = org.mockito.Mockito.mock(RLock.class);
+        when(redissonClient.getLock(anyString())).thenReturn(lock);
+        when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class)))
+                .thenThrow(new RedisConnectionException("Redis is down"));
     }
 
     @Test

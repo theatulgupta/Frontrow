@@ -16,7 +16,9 @@ import org.springframework.test.context.TestPropertySource;
         "frontrow.payment.latency-ms=0",
         "frontrow.hold-ttl=PT60S",
         "frontrow.lock.wait=PT60S",
-        "server.tomcat.threads.max=300"
+        "server.tomcat.threads.max=400",
+        "server.tomcat.accept-count=1000",
+        "server.tomcat.max-connections=2000"
 })
 class FrontRowLoadTest extends IntegrationTestBase {
 
