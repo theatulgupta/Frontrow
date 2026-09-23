@@ -105,6 +105,10 @@ public class CreateBookingService {
             if ("REJECT".equals(stored.decision()) || "CHALLENGE".equals(stored.decision())) {
                 throw riskException(stored.decision(), stored.reason(), showId, seatId);
             }
+            if ("ALLOW".equals(stored.decision())) {
+                metrics.conflict("seat_unavailable");
+                throw ApiException.seatUnavailable(showId, seatId);
+            }
         });
     }
 
@@ -166,7 +170,19 @@ public class CreateBookingService {
                 }
                 return held.booking();
             } catch (DataIntegrityViolationException exception) {
-                return resolveConflict(userId, show.id(), seatId, idempotencyKey);
+                try {
+                    return resolveConflict(userId, show.id(), seatId, idempotencyKey);
+                } catch (ApiException conflict) {
+                    if (ErrorCodes.SEAT_UNAVAILABLE.equals(conflict.code())) {
+                        recordLostAttempt(userId, show, seatId, idempotencyKey, outcome);
+                    }
+                    throw conflict;
+                }
+            } catch (ApiException exception) {
+                if (ErrorCodes.SEAT_UNAVAILABLE.equals(exception.code())) {
+                    recordLostAttempt(userId, show, seatId, idempotencyKey, outcome);
+                }
+                throw exception;
             }
         } finally {
             if (lock.isHeldByCurrentThread()) {
@@ -222,6 +238,22 @@ public class CreateBookingService {
             throw ApiException.idempotencyConflict(showId, seatId);
         }
         return new Held(existing, false);
+    }
+
+    private void recordLostAttempt(
+            String userId,
+            ShowResponse show,
+            UUID seatId,
+            String idempotencyKey,
+            RiskEvaluationService.Outcome outcome) {
+        transactions.executeWithoutResult(status -> attempts.insertIgnoringConflict(
+                UUID.randomUUID(),
+                userId,
+                show.id(),
+                seatId,
+                idempotencyKey,
+                outcome.assessment(),
+                outcome.signals()));
     }
 
     private BookingRecord resolveConflict(String userId, UUID showId, UUID seatId, String idempotencyKey) {

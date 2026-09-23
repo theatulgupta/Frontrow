@@ -2,6 +2,8 @@ package com.frontrow.outbox;
 
 import com.frontrow.config.FrontrowProperties;
 import com.frontrow.config.KafkaConfig;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
@@ -25,11 +27,20 @@ public class OutboxRelay {
             OutboxStore store,
             TransactionTemplate transactions,
             KafkaTemplate<String, String> kafka,
-            FrontrowProperties properties) {
+            FrontrowProperties properties,
+            MeterRegistry registry) {
         this.store = store;
         this.transactions = transactions;
         this.kafka = kafka;
         this.properties = properties;
+        Gauge.builder("frontrow.outbox.pending", store, OutboxStore::countPending).register(registry);
+    }
+
+    @Scheduled(cron = "0 0 3 * * *")
+    public void purgePublished() {
+        if (properties.getOutbox().isRelayEnabled()) {
+            store.purgePublished();
+        }
     }
 
     @Scheduled(fixedDelayString = "${frontrow.outbox.poll-interval}")

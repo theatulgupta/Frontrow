@@ -20,8 +20,7 @@ public class RedisConfig {
                 .setConnectTimeout(250)
                 .setTimeout(500)
                 .setRetryAttempts(0)
-                .setRetryInterval(200)
-                .setPingConnectionInterval(0);
+                .setRetryInterval(200);
         return Redisson.create(config);
     }
 }

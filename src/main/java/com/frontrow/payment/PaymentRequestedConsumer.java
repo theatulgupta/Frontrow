@@ -1,12 +1,12 @@
 package com.frontrow.payment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.frontrow.booking.BookingRecord;
-import com.frontrow.booking.BookingRepository;
 import com.frontrow.config.FrontrowMetrics;
 import com.frontrow.config.FrontrowProperties;
 import com.frontrow.config.KafkaConfig;
 import com.frontrow.config.MdcScope;
+import com.frontrow.inventory.BookingLifecycleStore;
+import com.frontrow.inventory.BookingLifecycleStore.ManagedBooking;
 import com.frontrow.inventory.SeatInventoryStore;
 import com.frontrow.outbox.PaymentRequestedEvent;
 import java.time.Duration;
@@ -25,7 +25,7 @@ public class PaymentRequestedConsumer {
     private static final Logger log = LoggerFactory.getLogger(PaymentRequestedConsumer.class);
 
     private final ObjectMapper objectMapper;
-    private final BookingRepository bookings;
+    private final BookingLifecycleStore bookings;
     private final PaymentRepository payments;
     private final SeatInventoryStore inventory;
     private final PaymentGateway gateway;
@@ -35,7 +35,7 @@ public class PaymentRequestedConsumer {
 
     public PaymentRequestedConsumer(
             ObjectMapper objectMapper,
-            BookingRepository bookings,
+            BookingLifecycleStore bookings,
             PaymentRepository payments,
             SeatInventoryStore inventory,
             PaymentGateway gateway,
@@ -58,9 +58,7 @@ public class PaymentRequestedConsumer {
         try {
             event = objectMapper.readValue(payload, PaymentRequestedEvent.class);
         } catch (Exception exception) {
-            log.error("payment_payload_invalid", exception);
-            acknowledgment.acknowledge();
-            return;
+            throw new IllegalArgumentException("payment_payload_invalid", exception);
         }
         try (MdcScope ignored = MdcScope.open(event.bookingId(), event.seatId(), event.showId(), event.userId())) {
             handle(event, acknowledgment);
@@ -68,7 +66,7 @@ public class PaymentRequestedConsumer {
     }
 
     private void handle(PaymentRequestedEvent event, Acknowledgment acknowledgment) {
-        BookingRecord booking = bookings.findById(event.bookingId()).orElse(null);
+        ManagedBooking booking = bookings.find(event.bookingId()).orElse(null);
         if (booking == null) {
             acknowledgment.acknowledge();
             return;
@@ -117,7 +115,7 @@ public class PaymentRequestedConsumer {
         acknowledgment.acknowledge();
     }
 
-    private void reapply(BookingRecord booking, PaymentRecord payment) {
+    private void reapply(ManagedBooking booking, PaymentRecord payment) {
         switch (payment.status()) {
             case SUCCEEDED -> transactions.executeWithoutResult(status -> {
                 inventory.markSoldIfOwner(booking.showId(), booking.seatId(), booking.id());
@@ -132,7 +130,7 @@ public class PaymentRequestedConsumer {
         }
     }
 
-    private void applySuccess(BookingRecord booking, String reference) {
+    private void applySuccess(ManagedBooking booking, String reference) {
         transactions.executeWithoutResult(status -> {
             int sold = inventory.markSoldIfOwner(booking.showId(), booking.seatId(), booking.id());
             if (sold == 1) {
@@ -145,12 +143,12 @@ public class PaymentRequestedConsumer {
             }
             if (payments.markVoided(booking.id()) == 1) {
                 metrics.payment("voided");
-                log.info("payment_voided");
+                log.info("payment_voided refund_required=true");
             }
         });
     }
 
-    private void applyDecline(BookingRecord booking, String reference) {
+    private void applyDecline(ManagedBooking booking, String reference) {
         transactions.executeWithoutResult(status -> {
             inventory.releaseIfOwner(booking.showId(), booking.seatId(), booking.id());
             bookings.markCancelled(booking.id());
@@ -161,7 +159,7 @@ public class PaymentRequestedConsumer {
         });
     }
 
-    private void finalizeTimeout(BookingRecord booking) {
+    private void finalizeTimeout(ManagedBooking booking) {
         transactions.executeWithoutResult(status -> {
             inventory.releaseIfOwner(booking.showId(), booking.seatId(), booking.id());
             bookings.markCancelled(booking.id());

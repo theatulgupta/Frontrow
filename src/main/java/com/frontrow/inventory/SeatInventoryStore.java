@@ -35,6 +35,7 @@ public class SeatInventoryStore {
                 UPDATE seat_inventory
                 SET status = 'SOLD', hold_expires_at = NULL, updated_at = now()
                 WHERE show_id = ? AND seat_id = ? AND status = 'HELD' AND booking_id = ?
+                  AND hold_expires_at > now()
                 """,
                 showId,
                 seatId,

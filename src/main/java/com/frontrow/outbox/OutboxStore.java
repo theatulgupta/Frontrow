@@ -61,6 +61,22 @@ public class OutboxStore {
                 id);
     }
 
+    public int countPending() {
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM outbox_messages WHERE status = 'PENDING'",
+                Integer.class);
+        return count == null ? 0 : count;
+    }
+
+    public int purgePublished() {
+        return jdbc.update(
+                """
+                DELETE FROM outbox_messages
+                WHERE status = 'PUBLISHED'
+                  AND published_at < now() - interval '7 days'
+                """);
+    }
+
     public int sweepStuck() {
         return jdbc.update(
                 """

@@ -41,8 +41,13 @@ class ArchitectureTest {
     static final ArchRule paymentDoesNotCallTheApiOrRisk = noClasses()
             .that().resideInAPackage("com.frontrow.payment..")
             .should().dependOnClassesThat().resideInAnyPackage(
-                    "com.frontrow.booking.api..",
+                    "com.frontrow.booking..",
                     "com.frontrow.risk..");
+
+    @ArchTest
+    static final ArchRule expiryDoesNotDependOnBooking = noClasses()
+            .that().resideInAPackage("com.frontrow.expiry..")
+            .should().dependOnClassesThat().resideInAPackage("com.frontrow.booking..");
 
     @ArchTest
     static final ArchRule identityHasNoDomainDependencies = noClasses()

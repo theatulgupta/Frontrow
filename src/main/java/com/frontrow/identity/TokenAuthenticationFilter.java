@@ -8,7 +8,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.regex.Pattern;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
@@ -21,9 +20,6 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
 
     public static final String USER_ATTRIBUTE = "frontrow.userId";
 
-    private static final Pattern SHOW = Pattern.compile("/api/shows/[^/]+");
-    private static final Pattern SEATS = Pattern.compile("/api/shows/[^/]+/seats");
-
     private final TokenSigner tokenSigner;
     private final ObjectMapper objectMapper;
 
@@ -35,7 +31,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        if (isPublic(request)) {
+        if (!requiresAuth(request)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -53,16 +49,13 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    private boolean isPublic(HttpServletRequest request) {
+    private boolean requiresAuth(HttpServletRequest request) {
         String path = request.getRequestURI();
         String method = request.getMethod();
-        if (path.startsWith("/actuator")) {
+        if ("GET".equals(method) && path.startsWith("/api/bookings/")) {
             return true;
         }
-        if ("GET".equals(method) && ("/api/shows".equals(path) || SHOW.matcher(path).matches() || SEATS.matcher(path).matches())) {
-            return true;
-        }
-        return "POST".equals(method) && "/api/dev/tokens".equals(path);
+        return "POST".equals(method) && path.matches("/api/shows/[^/]+/bookings");
     }
 
     private void writeUnauthorized(HttpServletResponse response) throws IOException {

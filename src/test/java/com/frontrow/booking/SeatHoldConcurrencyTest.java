@@ -27,5 +27,11 @@ class SeatHoldConcurrencyTest extends IntegrationTestBase {
         assertThat(countInventory(SEAT_A1, "HELD")).isEqualTo(1);
         assertThat(countBookings(SEAT_A1, "PENDING_PAYMENT")).isEqualTo(1);
         assertThat(countBookings(SEAT_A1, "CONFIRMED")).isZero();
+        Integer attempts = jdbc.queryForObject(
+                "SELECT count(*) FROM booking_attempts WHERE show_id = ? AND seat_id = ?",
+                Integer.class,
+                SHOW_ID,
+                SEAT_A1);
+        assertThat(attempts).isEqualTo(64);
     }
 }

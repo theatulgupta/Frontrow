@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: ${FRONTROW_DB_URL}
+    username: ${FRONTROW_DB_USER}
+    password: ${FRONTROW_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+  data:
+    redis:
+      host: ${FRONTROW_REDIS_HOST}
+      port: ${FRONTROW_REDIS_PORT}
+  kafka:
+    bootstrap-servers: ${FRONTROW_KAFKA_BOOTSTRAP}
+
+frontrow:
+  identity:
+    dev-tokens-enabled: false
+    token-secret: ${FRONTROW_TOKEN_SECRET}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus

@@ -24,9 +24,12 @@ Two hundred threads booking seat A1 must still produce exactly one `SOLD` ticket
 Start Postgres, Redis, and Kafka, then the app:
 
 ```bash
-docker compose up -d --wait
+docker-compose up -d --wait
 ./gradlew bootRun --args='--spring.profiles.active=local'
+cd web && npm install && npm run dev
 ```
+
+Postgres is published on host port 5433 so it does not collide with a local PostgreSQL install. The seat map is at http://localhost:5173.
 
 `bootRun` expects Compose. The local profile turns on `POST /api/dev/tokens`.
 

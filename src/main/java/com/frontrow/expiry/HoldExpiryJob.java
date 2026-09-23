@@ -1,8 +1,8 @@
 package com.frontrow.expiry;
 
-import com.frontrow.booking.BookingRepository;
 import com.frontrow.config.FrontrowMetrics;
 import com.frontrow.config.MdcScope;
+import com.frontrow.inventory.BookingLifecycleStore;
 import com.frontrow.inventory.HeldInventory;
 import com.frontrow.inventory.SeatInventoryStore;
 import java.util.List;
@@ -18,13 +18,13 @@ public class HoldExpiryJob {
     private static final Logger log = LoggerFactory.getLogger(HoldExpiryJob.class);
 
     private final SeatInventoryStore inventory;
-    private final BookingRepository bookings;
+    private final BookingLifecycleStore bookings;
     private final TransactionTemplate transactions;
     private final FrontrowMetrics metrics;
 
     public HoldExpiryJob(
             SeatInventoryStore inventory,
-            BookingRepository bookings,
+            BookingLifecycleStore bookings,
             TransactionTemplate transactions,
             FrontrowMetrics metrics) {
         this.inventory = inventory;

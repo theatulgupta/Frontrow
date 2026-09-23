@@ -63,6 +63,36 @@ public class AttemptRepository {
                 signals.inFlightHolds());
     }
 
+    public void insertIgnoringConflict(
+            UUID id,
+            String userId,
+            UUID showId,
+            UUID seatId,
+            String idempotencyKey,
+            RiskAssessment assessment,
+            RiskSignals signals) {
+        jdbc.update(
+                """
+                INSERT INTO booking_attempts (
+                    id, user_id, show_id, seat_id, idempotency_key, decision, reason, flagged,
+                    user_attempt_count, seat_attempt_count, distinct_seat_count, in_flight_holds
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (user_id, idempotency_key) DO NOTHING
+                """,
+                id,
+                userId,
+                showId,
+                seatId,
+                idempotencyKey,
+                assessment.decision().name(),
+                assessment.reason(),
+                assessment.flagged(),
+                signals.userAttempts(),
+                signals.seatAttempts(),
+                signals.distinctSeats(),
+                signals.inFlightHolds());
+    }
+
     public record StoredAttempt(String decision, String reason, UUID showId, UUID seatId) {
     }
 }
