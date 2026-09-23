@@ -1,0 +1,74 @@
+spring:
+  application:
+    name: frontrow
+  datasource:
+    hikari:
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: frontrow-payment
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      max-poll-records: 1
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    listener:
+      ack-mode: manual
+      concurrency: 3
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: ecs
+
+frontrow:
+  hold-ttl: ${FRONTROW_HOLD_TTL:PT2M}
+  lock:
+    wait: ${FRONTROW_LOCK_WAIT:PT0.2S}
+    lease: ${FRONTROW_LOCK_LEASE:PT10S}
+  payment:
+    mode: ${FRONTROW_PAYMENT_MODE:SUCCESS}
+    latency-ms: ${FRONTROW_PAYMENT_LATENCY_MS:50}
+    timeout-ms: ${FRONTROW_PAYMENT_TIMEOUT_MS:200}
+    max-attempts: ${FRONTROW_PAYMENT_MAX_ATTEMPTS:3}
+    consumer-enabled: true
+  risk:
+    provider: ${FRONTROW_RISK_PROVIDER:local}
+    timeout-ms: ${FRONTROW_RISK_TIMEOUT_MS:150}
+    window: ${FRONTROW_RISK_WINDOW:PT60S}
+  ai:
+    api-key: ${FRONTROW_AI_API_KEY:}
+    model: ${FRONTROW_AI_MODEL:gpt-4o-mini}
+  outbox:
+    poll-interval: PT0.2S
+    relay-enabled: true
+  expiry:
+    scan-interval: PT1S
+  identity:
+    token-secret: ${FRONTROW_TOKEN_SECRET:dev-only-change-me}
+    dev-tokens-enabled: false
+    token-ttl: PT12H

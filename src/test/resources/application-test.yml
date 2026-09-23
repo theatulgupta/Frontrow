@@ -1,0 +1,17 @@
+spring:
+  kafka:
+    listener:
+      concurrency: 1
+  datasource:
+    hikari:
+      maximum-pool-size: 20
+
+frontrow:
+  identity:
+    dev-tokens-enabled: true
+    token-secret: test-secret
+
+logging:
+  structured:
+    format:
+      console: ecs
