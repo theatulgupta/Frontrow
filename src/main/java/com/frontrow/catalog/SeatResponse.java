@@ -8,5 +8,6 @@ public record SeatResponse(
         String rowLabel,
         int seatNumber,
         boolean frontRow,
-        String status) {
+        String status,
+        String holderName) {
 }

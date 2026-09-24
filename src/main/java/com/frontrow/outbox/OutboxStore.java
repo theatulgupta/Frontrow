@@ -15,13 +15,17 @@ public class OutboxStore {
     }
 
     public void insert(UUID id, UUID aggregateId, String payload) {
+        insert(id, aggregateId, PaymentRequestedEvent.EVENT_TYPE, payload);
+    }
+
+    public void insert(UUID id, UUID aggregateId, String eventType, String payload) {
         jdbc.update(
                 """
                 INSERT INTO outbox_messages (id, event_type, aggregate_id, payload, status)
                 VALUES (?, ?, ?, ?::jsonb, 'PENDING')
                 """,
                 id,
-                PaymentRequestedEvent.EVENT_TYPE,
+                eventType,
                 aggregateId,
                 payload);
     }

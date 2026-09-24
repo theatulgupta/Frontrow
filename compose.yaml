@@ -69,3 +69,11 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+
+  web:
+    profiles: ["app"]
+    build: ./web
+    ports:
+      - "4173:80"
+    depends_on:
+      - frontrow

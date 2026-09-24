@@ -35,9 +35,12 @@ public class ShowController {
         catalog.requireShow(showId);
         return jdbc.query(
                 """
-                SELECT st.id, st.section, st.row_label, st.seat_number, st.front_row, i.status
+                SELECT st.id, st.section, st.row_label, st.seat_number, st.front_row, i.status,
+                       COALESCE(patrons.display_name, bookings.user_id) AS holder_name
                 FROM seats st
                 JOIN seat_inventory i ON i.seat_id = st.id
+                LEFT JOIN bookings ON bookings.id = i.booking_id
+                LEFT JOIN patrons ON patrons.user_id = bookings.user_id
                 WHERE i.show_id = ?
                 ORDER BY st.row_label, st.seat_number
                 """,
@@ -47,7 +50,8 @@ public class ShowController {
                         rs.getString("row_label"),
                         rs.getInt("seat_number"),
                         rs.getBoolean("front_row"),
-                        rs.getString("status")),
+                        rs.getString("status"),
+                        rs.getString("holder_name")),
                 showId);
     }
 }

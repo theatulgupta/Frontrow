@@ -13,8 +13,8 @@ class CatalogSeedTest extends IntegrationTestBase {
         Integer available = jdbc.queryForObject(
                 "SELECT count(*) FROM seat_inventory WHERE status = 'AVAILABLE'",
                 Integer.class);
-        assertThat(frontRow).isEqualTo(8);
-        assertThat(available).isEqualTo(16);
+        assertThat(frontRow).isEqualTo(12);
+        assertThat(available).isEqualTo(216);
 
         HttpResult shows = get("/api/shows");
         assertThat(shows.status()).isEqualTo(200);

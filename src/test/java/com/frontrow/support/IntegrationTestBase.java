@@ -74,6 +74,9 @@ public abstract class IntegrationTestBase {
 
     @BeforeEach
     void resetState() {
+        jdbc.update("DELETE FROM flight_payments");
+        jdbc.update("DELETE FROM flight_bookings");
+        jdbc.update("UPDATE flight_offers SET seats_held = 0, seats_sold = 0");
         jdbc.update("DELETE FROM payments");
         jdbc.update("DELETE FROM outbox_messages");
         jdbc.update("DELETE FROM booking_attempts");
@@ -103,6 +106,25 @@ public abstract class IntegrationTestBase {
     protected HttpResult getBooking(String userId, String bookingId) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + "/api/bookings/" + bookingId))
+                .header("Authorization", "Bearer " + token(userId))
+                .GET()
+                .build();
+        return send(request);
+    }
+
+    protected HttpResult postFlight(String userId, UUID offerId, String idempotencyKey) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/api/flights/" + offerId + "/bookings"))
+                .header("Authorization", "Bearer " + token(userId))
+                .header("Idempotency-Key", idempotencyKey)
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+        return send(request);
+    }
+
+    protected HttpResult getFlightBooking(String userId, String bookingId) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/api/flight-bookings/" + bookingId))
                 .header("Authorization", "Bearer " + token(userId))
                 .GET()
                 .build();

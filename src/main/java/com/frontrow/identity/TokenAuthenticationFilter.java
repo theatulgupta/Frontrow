@@ -52,10 +52,10 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
     private boolean requiresAuth(HttpServletRequest request) {
         String path = request.getRequestURI();
         String method = request.getMethod();
-        if ("GET".equals(method) && path.startsWith("/api/bookings/")) {
+        if ("GET".equals(method) && (path.startsWith("/api/bookings/") || path.startsWith("/api/flight-bookings/"))) {
             return true;
         }
-        return "POST".equals(method) && path.matches("/api/shows/[^/]+/bookings");
+        return "POST".equals(method) && (path.matches("/api/shows/[^/]+/bookings") || path.matches("/api/flights/[^/]+/bookings"));
     }
 
     private void writeUnauthorized(HttpServletResponse response) throws IOException {

@@ -29,7 +29,9 @@ docker-compose up -d --wait
 cd web && npm install && npm run dev
 ```
 
-Postgres is published on host port 5433 so it does not collide with a local PostgreSQL install. The seat map is at http://localhost:5173.
+Postgres is published on host port 5433 so it does not collide with a local PostgreSQL install. The home page at http://localhost:5173 searches flights, trains, buses, and hotels. Only flights can be held and paid. Events keeps the seat map at http://localhost:5173/shows.
+
+The web app is a separate client. `features/identity`, `features/catalog`, and `features/booking` match the Java packages. TanStack Query owns server data. TanStack Router owns the signed-in gate. `docker-compose --profile app up --build` also serves that client at http://localhost:4173, with nginx proxying `/api` to the API container.
 
 `bootRun` expects Compose. The local profile turns on `POST /api/dev/tokens`.
 

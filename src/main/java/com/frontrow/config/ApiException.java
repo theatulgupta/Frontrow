@@ -52,6 +52,10 @@ public class ApiException extends RuntimeException {
         return new ApiException(HttpStatus.NOT_FOUND, ErrorCodes.NOT_FOUND, message, null, null, null);
     }
 
+    public static ApiException fareFull() {
+        return new ApiException(HttpStatus.CONFLICT, "FARE_UNAVAILABLE", "This fare is full", null, null, null);
+    }
+
     public static ApiException seatUnavailable(UUID showId, UUID seatId) {
         return new ApiException(HttpStatus.CONFLICT, ErrorCodes.SEAT_UNAVAILABLE, "Seat is not available", showId, seatId, null);
     }

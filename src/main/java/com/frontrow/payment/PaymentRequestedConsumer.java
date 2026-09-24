@@ -1,5 +1,6 @@
 package com.frontrow.payment;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.frontrow.config.FrontrowMetrics;
 import com.frontrow.config.FrontrowProperties;
@@ -9,6 +10,8 @@ import com.frontrow.inventory.BookingLifecycleStore;
 import com.frontrow.inventory.BookingLifecycleStore.ManagedBooking;
 import com.frontrow.inventory.SeatInventoryStore;
 import com.frontrow.outbox.PaymentRequestedEvent;
+import com.frontrow.travel.FlightBookingService.FlightPaymentEvent;
+import com.frontrow.travel.FlightInventoryStore;
 import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +31,8 @@ public class PaymentRequestedConsumer {
     private final BookingLifecycleStore bookings;
     private final PaymentRepository payments;
     private final SeatInventoryStore inventory;
+    private final FlightInventoryStore flightInventory;
+    private final FlightPaymentRepository flightPayments;
     private final PaymentGateway gateway;
     private final TransactionTemplate transactions;
     private final FrontrowProperties properties;
@@ -38,6 +43,8 @@ public class PaymentRequestedConsumer {
             BookingLifecycleStore bookings,
             PaymentRepository payments,
             SeatInventoryStore inventory,
+            FlightInventoryStore flightInventory,
+            FlightPaymentRepository flightPayments,
             PaymentGateway gateway,
             TransactionTemplate transactions,
             FrontrowProperties properties,
@@ -46,6 +53,8 @@ public class PaymentRequestedConsumer {
         this.bookings = bookings;
         this.payments = payments;
         this.inventory = inventory;
+        this.flightInventory = flightInventory;
+        this.flightPayments = flightPayments;
         this.gateway = gateway;
         this.transactions = transactions;
         this.properties = properties;
@@ -54,15 +63,87 @@ public class PaymentRequestedConsumer {
 
     @KafkaListener(topics = KafkaConfig.PAYMENT_REQUESTED)
     public void onPaymentRequested(String payload, Acknowledgment acknowledgment) {
-        PaymentRequestedEvent event;
+        JsonNode node;
         try {
-            event = objectMapper.readValue(payload, PaymentRequestedEvent.class);
+            node = objectMapper.readTree(payload);
         } catch (Exception exception) {
             throw new IllegalArgumentException("payment_payload_invalid", exception);
         }
+        if ("flight.payment-requested".equals(node.path("eventType").asText())) {
+            FlightPaymentEvent event = objectMapper.convertValue(node, FlightPaymentEvent.class);
+            try (MdcScope ignored = MdcScope.open(event.bookingId(), null, event.offerId(), event.userId())) {
+                handleFlight(event, acknowledgment);
+            }
+            return;
+        }
+        PaymentRequestedEvent event = objectMapper.convertValue(node, PaymentRequestedEvent.class);
         try (MdcScope ignored = MdcScope.open(event.bookingId(), event.seatId(), event.showId(), event.userId())) {
             handle(event, acknowledgment);
         }
+    }
+
+    private void handleFlight(FlightPaymentEvent event, Acknowledgment acknowledgment) {
+        var booking = flightInventory.findBooking(event.bookingId()).orElse(null);
+        if (booking == null) {
+            acknowledgment.acknowledge();
+            return;
+        }
+        PaymentRecord existing = flightPayments.findByBookingId(booking.id()).orElse(null);
+        if (!flightInventory.isPayable(booking.id())) {
+            if (existing != null && existing.status() == PaymentStatus.PENDING && flightPayments.markVoided(booking.id()) == 1) {
+                metrics.payment("voided");
+                log.info("payment_voided");
+            }
+            acknowledgment.acknowledge();
+            return;
+        }
+        if (existing != null && existing.status() != PaymentStatus.PENDING) {
+            acknowledgment.acknowledge();
+            return;
+        }
+        if (existing == null) {
+            existing = flightPayments.insertPending(booking.id());
+        }
+        if (existing.attemptCount() >= properties.getPayment().getMaxAttempts()) {
+            transactions.executeWithoutResult(status -> flightInventory.cancelAndRelease(booking.id()));
+            flightPayments.markTimedOut(booking.id());
+            acknowledgment.acknowledge();
+            return;
+        }
+        PaymentResult result;
+        try {
+            result = gateway.charge(booking.id(), booking.amountCents());
+        } catch (PaymentTimeoutException exception) {
+            int attempts = flightPayments.incrementAttempt(booking.id());
+            if (attempts >= properties.getPayment().getMaxAttempts()) {
+                transactions.executeWithoutResult(status -> flightInventory.cancelAndRelease(booking.id()));
+                flightPayments.markTimedOut(booking.id());
+                acknowledgment.acknowledge();
+            } else {
+                acknowledgment.nack(Duration.ofSeconds(1));
+            }
+            return;
+        }
+        if (!result.success()) {
+            transactions.executeWithoutResult(status -> flightInventory.cancelAndRelease(booking.id()));
+            if (flightPayments.markDeclined(booking.id(), result.gatewayReference()) == 1) {
+                metrics.payment("declined");
+                log.info("payment_declined");
+            }
+            acknowledgment.acknowledge();
+            return;
+        }
+        Integer sold = transactions.execute(status -> flightInventory.confirmAndSell(booking.id()));
+        if (sold != null && sold == 1) {
+            if (flightPayments.markSucceeded(booking.id(), result.gatewayReference()) == 1) {
+                metrics.payment("succeeded");
+                log.info("payment_succeeded");
+            }
+        } else if (flightPayments.markVoided(booking.id()) == 1) {
+            metrics.payment("voided");
+            log.info("payment_voided refund_required=true");
+        }
+        acknowledgment.acknowledge();
     }
 
     private void handle(PaymentRequestedEvent event, Acknowledgment acknowledgment) {

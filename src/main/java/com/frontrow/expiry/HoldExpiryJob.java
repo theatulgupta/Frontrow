@@ -5,6 +5,7 @@ import com.frontrow.config.MdcScope;
 import com.frontrow.inventory.BookingLifecycleStore;
 import com.frontrow.inventory.HeldInventory;
 import com.frontrow.inventory.SeatInventoryStore;
+import com.frontrow.travel.FlightInventoryStore;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,16 +20,19 @@ public class HoldExpiryJob {
 
     private final SeatInventoryStore inventory;
     private final BookingLifecycleStore bookings;
+    private final FlightInventoryStore flights;
     private final TransactionTemplate transactions;
     private final FrontrowMetrics metrics;
 
     public HoldExpiryJob(
             SeatInventoryStore inventory,
             BookingLifecycleStore bookings,
+            FlightInventoryStore flights,
             TransactionTemplate transactions,
             FrontrowMetrics metrics) {
         this.inventory = inventory;
         this.bookings = bookings;
+        this.flights = flights;
         this.transactions = transactions;
         this.metrics = metrics;
     }
@@ -47,6 +51,11 @@ public class HoldExpiryJob {
                 try (MdcScope ignored = MdcScope.open(row.bookingId(), row.seatId(), row.showId(), null)) {
                     log.info("hold_expired");
                 }
+            }
+            int flightsReleased = flights.expireDueHolds();
+            for (int i = 0; i < flightsReleased; i++) {
+                metrics.holdExpired();
+                log.info("flight_hold_expired");
             }
         });
     }
